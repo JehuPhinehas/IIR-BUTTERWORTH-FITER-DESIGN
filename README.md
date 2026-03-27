@@ -1,5 +1,4 @@
-
-## EXP 3 B : IIR CHEBYSHEV FITER DESIGN
+## EXP 3 A : IIR BUTTERWORTH FITER DESIGN
 
 ### AIM: 
  To design an IIR Butterworth filter using bilinear transformation in SCILAB. 
@@ -13,172 +12,140 @@ clc;
 clear;
 close;
 
-//  INPUTS 
-wp = input('Passband digital frequency (radians) = ');
-ws = input('Stopband digital frequency (radians) = ');
-alphap = input('Passband attenuation (Linear) = ');
-alphas = input('Stopband attenuation (Linear) = ');
-T = input('Sampling time = ');
+// INPUTS
+wp = input('Pass band digital frequency (Radians)= ');
+ws = input('Stop band digital frequency (Radians)= ');
 
-//  PREWARPING 
+// Linear gains
+Ap = input('Pass band gain (Linear)= ');
+As = input('Stop band gain (Linear)= ');
+T = input('Sampling Time= ');
+
+// PREWARPING
 omegap = (2/T)*tan(wp/2);
-disp("Prewarped passband frequency omegap = " + string(omegap));
-
 omegas = (2/T)*tan(ws/2);
-disp("Prewarped stopband frequency omegas = " + string(omegas));
 
-// RIPPLE FACTOR 
-epsilon = sqrt(10^(alphap/10) - 1);
-disp("Ripple factor epsilon = " + string(epsilon));
+disp("Prewarped omega p = " + string(omegap));
+disp("Prewarped omega s = " + string(omegas));
 
-//  FILTER ORDER 
-N_exact = acosh( sqrt((10^(alphas/10)-1)/(10^(alphap/10)-1)) )/ acosh(omegas/omegap);
+// ORDER
+N = (1/2) * log10(((1/(As^2))-1)/((1/(Ap^2))-1)) / log10(omegas/omegap);
+disp("Calculated Order N = " + string(N));
 
-N = ceil(N_exact);
-disp("Rounded filter order N = " + string(N));
+N = ceil(N);
+disp("Rounded Order N = " + string(N));
 
-// NORMALIZED POLES (Ωc = 1) 
-beta = (1/N) * asinh(1/epsilon);
-pols_norm = [];
+// CUTOFF
+omegac = omegas / (((1/(As^2))-1)^(1/(2*N)));
+disp("Cutoff frequency omega c = " + string(omegac));
 
-for k = 1:N
-    
-    theta = %pi*(2*k-1)/(2*N);
-    
-    sigma = -sinh(beta)*sin(theta);
-    omega = cosh(beta)*cos(theta);
-    
-    pol_norm = sigma + %i*omega;
-    pols_norm = [pols_norm pol_norm];
-end
+// NORMALIZED ANALOG FILTER
 
-disp("Normalized poles = ");
-disp(pols_norm);
+Hs_norm = analpf(N, 'butt', [0,0], 1);
+disp("Normalized Analog Transfer Function Hn(s) = ");
+disp(Hs_norm);
 
-//  NORMALIZED TRANSFER FUNCTION 
-s = poly(0,'s');
 
-den_norm = real(poly(pols_norm,'s'));
-num_norm = real(prod(-pols_norm));
+// UNNORMALIZED ANALOG FILTER
 
-Hn = num_norm / den_norm;
-
-disp("Normalized Transfer Function Hn(s) (Ωc=1) = ");
-disp(Hn);
-
-//  UNNORMALIZED (SCALED) POLES 
-omegac = omegap;   // Chebyshev Type-I
-
-pols = omegac * pols_norm;   // scale poles directly
-
-disp("Scaled Analog poles = ");
-disp(pols);
-
-//  UNNORMALIZED TRANSFER FUNCTION
-den_s = real(poly(pols,'s'));
-num_s = real(prod(-pols));
-
-Hs = num_s / den_s;
-
+Hs = analpf(N, 'butt', [0,0], omegac);
 disp("Unnormalized Analog Transfer Function H(s) = ");
 disp(Hs);
 
-//  BILINEAR TRANSFORMATION 
-z = poly(0,'z');
 
+// BILINEAR TRANSFORMATION
+
+z = poly(0,'z');
 Hz = horner(Hs, (2/T)*((z-1)/(z+1)));
 
 disp("Digital Transfer Function H(z) = ");
 disp(Hz);
 
-//  FREQUENCY RESPONSE 
+
+// FREQUENCY RESPONSE
 HW = frmag(Hz,512);
 w = 0:%pi/511:%pi;
 
 plot(w/%pi, abs(HW));
-xlabel("Normalized Digital Frequency (×π rad/sample)");
-ylabel("Magnitude");
-title("Frequency Response of Chebyshev Type-I IIR LPF");
+xlabel('Normalized Digital Frequency (w/pi)');
+ylabel('Magnitude');
+title('Frequency Response of Butterworth IIR LPF');
 
 ```
 
 
 ### PROGRAM (HPF): 
 ```python
-lc;
+clc;
+clear;
 close;
 
-// User Inputs
-wp = input('Pass band frequency (Radians)= ');  // Passband edge > Stopband edge
-ws = input('Stop band frequency (Radians)= ');
-alphap = input('Pass band attenuation (dB)= ');
-alphas = input('Stop band attenuation (dB)= ');
-T = input('Sampling Time= ');
+// GIVEN SPECIFICATIONS
+T = 0.5;
 
-// Pre-warping (Bilinear Transformation)
-omegap = (2/T)*tan(wp/2);   // Passband edge (analog)
-disp(omegap,'omegap=');
-omegas = (2/T)*tan(ws/2);   // Stopband edge (analog)
-disp(omegas,'omegas=');
+wp = 0.65*%pi;
+ws = 0.45*%pi;
 
-// Order of the HPF
-N = acosh(sqrt(((10^(0.1*alphas))-1)/((10^(0.1*alphap))-1))) / acosh(omegap/omegas);
-disp(N,'N=');
-N = ceil(N);
-disp('Round off value of N=',N);
+Gp = 0.707;
+Gs = 0.2;
 
-// Cutoff frequency
-omegac = omegap / (((10^(0.1*alphap))-1)^(1/(2*N)));
-disp('omegac=',omegac);
+// PREWARPING (Bilinear Transformation)
+omegap = (2/T)*tan(wp/2);
+omegas = (2/T)*tan(ws/2);
 
+disp("Prewarped passband frequency = " + string(omegap));
+disp("Prewarped stopband frequency = " + string(omegas));
 
-// Chebyshev Prototype (Normalized LPF)
-Epsilon = sqrt((10^(0.1*alphap))-1);
-disp('Epsilon=',Epsilon);
+// FILTER ORDER CALCULATION
+N_exact = (1/2)*log10(((1/(Gs^2))-1)/((1/(Gp^2))-1)) / log10(omegap/omegas);
+disp("Exact filter order = " + string(N_exact));
 
-[pols, gn] = zpch1(N, Epsilon, 1);   // normalized LPF prototype at 1 rad/s
-disp('Gain',gn);
-disp('Poles',pols);
+N = ceil(N_exact);
+disp("Rounded filter order = " + string(N));
 
-s = poly(0,'s');   // Laplace variable
-hs = poly(gn,'s','coeff') / real(poly(pols,'s'));
-disp('Analog Normalized Chebyshev LPF',hs);
+// CUTOFF FREQUENCY
+omegac = omegap*((1/(Gp^2)-1)^(1/(2*N)));
+disp("Cutoff frequency = " + string(omegac));
 
+// ANALOG BUTTERWORTH LPF PROTOTYPE
+hs_lpf = analpf(N,"butt",[0,0],1);
 
-// LPF → HPF Transformation (s -> omegac/s)
+// LPF → HPF TRANSFORMATION
+s = poly(0,'s');
+hs_hpf = horner(hs_lpf, omegac/s);
 
-sh = horner(hs, omegac/s);
-disp('Analog Chebyshev High-Pass Filter',sh);
+disp("Analog High Pass Transfer Function H(s)");
+disp(hs_hpf);
 
+// BILINEAR TRANSFORMATION
+z = poly(0,'z');
+Hz = horner(hs_hpf,(2/T)*((z-1)/(z+1)));
 
-// Bilinear Transformation: s -> (2/T)*((z-1)/(z+1))
-z = poly(0,'z');   // z-domain variable
-Hz = horner(sh, (2/T) * ((z-1)/(z+1)));
-disp('Digital HPF Transfer function H(Z)=',Hz);
+disp("Digital High Pass Filter H(z)");
+disp(Hz);
 
-// Frequency Response
-HW = frmag(Hz, 512);
+// FREQUENCY RESPONSE
+HW = frmag(Hz,512);
 w = 0:%pi/511:%pi;
 
-plot(w/%pi, abs(HW));
-xlabel('Normalized Digital Frequency ×π rad/sample');
-ylabel('Magnitude');
-title('Frequency Response of Chebyshev IIR High-Pass Filter');
+plot(w/%pi,abs(HW));
+xlabel("Normalized Frequency (w/pi)");
+ylabel("Magnitude");
+title("Frequency Response of Butterworth HPF");
+xgrid();
 
 ```
 
 
 ### OUTPUT (LPF) : 
+<img width="340" height="451" alt="image" src="https://github.com/user-attachments/assets/75a60249-8d8e-4f10-bb3b-a450ad3402b7" />
 
-<img width="413" height="591" alt="image" src="https://github.com/user-attachments/assets/695921c0-7cd9-4ea5-999a-7c719036eea5" />
-<img width="419" height="455" alt="image" src="https://github.com/user-attachments/assets/185261d5-fa23-4273-b7e0-9fb0e20e9e35" />
+<img width="351" height="492" alt="image" src="https://github.com/user-attachments/assets/10f3277c-2a4d-4bba-8649-d594111e4463" />
 
+### OUTPUT (HPF) :
+<img width="295" height="406" alt="image" src="https://github.com/user-attachments/assets/bbaca645-a0b8-4d8c-abcd-44bcc0847a60" />
 
-
-### OUTPUT (HPF) : 
-<img width="402" height="558" alt="image" src="https://github.com/user-attachments/assets/9a07374f-14f0-489e-94d1-f6d4b9939c94" />
-
-<img width="425" height="453" alt="image" src="https://github.com/user-attachments/assets/4f431c69-8a13-441e-850a-72b5774de5a2" />
+<img width="345" height="493" alt="image" src="https://github.com/user-attachments/assets/51062bc8-25f6-4534-9e7b-f827b984617e" />
 
 ### RESULT: 
-Thus , the IIR Chebyshev filter was designed successfully using bilinear transformation in SCILAB.
+Thus , the IIR Butterworth filter was designed successfully using bilinear transformation in SCILAB.
